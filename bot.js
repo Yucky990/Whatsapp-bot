@@ -2,8 +2,9 @@ const makeWASocket = require("@whiskeysockets/baileys").default;
 const { useMultiFileAuthState, fetchLatestBaileysVersion, downloadContentFromMessage } = require("@whiskeysockets/baileys");
 const fs = require("fs");
 const { exec } = require("child_process");
+const express = require("express");
 
-const tempFolder = "U:/WA/temp"; // Folder sementara untuk gambar stiker
+const tempFolder = "/tmp/WA/temp"; // Folder sementara untuk gambar stiker (Linux-friendly)
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState("auth_info");
@@ -110,4 +111,11 @@ async function startBot() {
     });
 }
 
+// Jalankan bot WhatsApp
 startBot();
+
+// Jalankan server Express untuk Koyeb
+const app = express();
+app.get("/", (req, res) => res.send("Bot WhatsApp Running!"));
+const port = process.env.PORT || 8000;
+app.listen(port, () => console.log(`✅ Server berjalan di port ${port}`));
