@@ -3,6 +3,7 @@ const { useMultiFileAuthState, fetchLatestBaileysVersion, downloadContentFromMes
 const fs = require("fs");
 const { exec } = require("child_process");
 const express = require("express");
+const qrImage = require("qr-image");
 
 const tempFolder = "/tmp/WA/temp"; // Folder sementara untuk gambar stiker (Linux-friendly)
 
@@ -15,6 +16,13 @@ async function startBot() {
         version: version,
         printQRInTerminal: true,
         syncFullHistory: true,
+    });
+
+    sock.ev.on("qr", async (qr) => {
+        console.log("📸 QR Code diperbarui!");
+
+        const qr_svg = qrImage.image(qr, { type: "png" });
+        qr_svg.pipe(fs.createWriteStream("qr.png"));
     });
 
     sock.ev.on("creds.update", saveCreds);
@@ -35,7 +43,6 @@ async function startBot() {
             if (!message.message || message.key.fromMe) return;
 
             const remoteJid = message.key.remoteJid;
-            const sender = message.key.participant || message.key.remoteJid;
             const textMessage = message.message.conversation || message.message.extendedTextMessage?.text || "";
 
             console.log(`📩 Pesan diterima: ${textMessage}`);
@@ -54,26 +61,6 @@ async function startBot() {
                 });
 
                 console.log("✅ Tagall berhasil dikirim!");
-            }
-
-            // 📌 Command: .hidetag .tagall (Mention Semua Tanpa Terlihat)
-            if (textMessage.includes(".hidetag") && textMessage.includes(".tagall")) {
-                const groupMetadata = await sock.groupMetadata(remoteJid);
-                const participants = groupMetadata.participants.map(p => p.id);
-                
-                let customText = textMessage.split(".hidetag .tagall")[0].trim();
-                if (!customText) customText = "📢 Info Penting:";
-
-                await sock.sendMessage(remoteJid, {
-                    text: customText,
-                    mentions: participants
-                });
-
-                // Hapus perintah setelah 3 detik agar hanya pengirim yang tahu
-                setTimeout(async () => {
-                    await sock.sendMessage(remoteJid, { delete: message.key });
-                    console.log("🗑️ Perintah .hidetag .tagall dihapus!");
-                }, 3000);
             }
 
             // 📌 Command: .s (Buat Stiker dari Gambar)
@@ -116,6 +103,18 @@ startBot();
 
 // Jalankan server Express untuk Koyeb
 const app = express();
-app.get("/", (req, res) => res.send("Bot WhatsApp Running!"));
+
+app.get("/", (req, res) => res.send("🚀 Bot WhatsApp Running!"));
+
+// Route untuk menampilkan QR Code sebagai gambar
+app.get("/qr", (req, res) => {
+    const qrPath = __dirname + "/qr.png";
+    if (fs.existsSync(qrPath)) {
+        res.sendFile(qrPath);
+    } else {
+        res.send("🔄 QR belum tersedia, tunggu sebentar...");
+    }
+});
+
 const port = process.env.PORT || 8000;
 app.listen(port, () => console.log(`✅ Server berjalan di port ${port}`));
